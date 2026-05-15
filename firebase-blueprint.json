@@ -1,0 +1,124 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "A pantry sense user",
+      "type": "object",
+      "properties": {
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "User's email"
+        },
+        "name": {
+          "type": "string",
+          "description": "User's display name"
+        },
+        "role": {
+          "type": "string",
+          "enum": ["admin", "client"],
+          "description": "User role for RBAC"
+        }
+      },
+      "required": ["email", "name", "role"]
+    },
+    "PantryItem": {
+      "title": "PantryItem",
+      "description": "An item in the user's pantry",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Owner of the pantry item"
+        },
+        "name": {
+          "type": "string",
+          "description": "Item name"
+        },
+        "category": {
+          "type": "string",
+          "description": "Category of food"
+        },
+        "quantity": {
+          "type": "number",
+          "description": "Amount of item"
+        },
+        "unit": {
+          "type": "string",
+          "description": "Unit of measurement"
+        },
+        "expiryDate": {
+          "type": "string",
+          "description": "ISO date string marking expiration"
+        },
+        "location": {
+          "type": "string",
+          "description": "Where the item is physically stored"
+        },
+        "cost": {
+          "type": "number",
+          "description": "Cost in INR"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Creation timestamp"
+        }
+      },
+      "required": ["userId", "name", "category", "quantity", "unit", "expiryDate", "location", "cost", "createdAt"]
+    },
+    "SharedRecipe": {
+      "title": "SharedRecipe",
+      "description": "A recipe shared with the community",
+      "type": "object",
+      "properties": {
+        "authorId": {
+          "type": "string",
+          "description": "UID of the creator"
+        },
+        "authorName": {
+          "type": "string",
+          "description": "Name of the creator"
+        },
+        "title": {
+          "type": "string",
+          "description": "Recipe title"
+        },
+        "ingredients": {
+          "type": "array",
+          "description": "List of strings marking ingredients",
+          "items": { "type": "string" }
+        },
+        "instructions": {
+          "type": "array",
+          "description": "List of strings marking instruction steps",
+          "items": { "type": "string" }
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Creation timestamp"
+        }
+      },
+      "required": ["authorId", "authorName", "title", "ingredients", "instructions", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": {
+        "$ref": "#/entities/User"
+      },
+      "description": "Stores user profiles"
+    },
+    "/pantry/{itemId}": {
+      "schema": {
+        "$ref": "#/entities/PantryItem"
+      },
+      "description": "Stores pantry items. Each item belongs to a specific user."
+    },
+    "/recipes/{recipeId}": {
+      "schema": {
+        "$ref": "#/entities/SharedRecipe"
+      },
+      "description": "Stores community-shared recipes."
+    }
+  }
+}

@@ -1,0 +1,124 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Document ID: {userId}
+    // Fields:
+    //   - email: string (required)
+    //   - name: string (required)
+    //   - role: string (required, 'admin' or 'client')
+    //
+    // Collection: pantry
+    // Document ID: {itemId}
+    // Fields:
+    //   - userId: string (required)
+    //   - name: string (required)
+    //   - category: string (required)
+    //   - quantity: number (required)
+    //   - unit: string (required)
+    //   - expiryDate: string (required)
+    //   - location: string (required)
+    //   - cost: number (required)
+    //   - createdAt: string (required)
+    //
+    // Collection: recipes
+    // Document ID: {recipeId}
+    // Fields:
+    //   - authorId: string (required)
+    //   - authorName: string (required)
+    //   - title: string (required)
+    //   - ingredients: list (required)
+    //   - instructions: list (required)
+    //   - createdAt: string (required)
+    // ===============================================================
+
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isDocOwner() {
+      return isAuthenticated() && request.auth.uid == resource.data.userId;
+    }
+
+    function isRecipeOwner() {
+      return isAuthenticated() && request.auth.uid == resource.data.authorId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && 
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' || 
+         (request.auth.token.email == "dineshaditya74@gmail.com" && request.auth.token.email_verified == true));
+    }
+
+    // Validation functions
+    function isValidUser(data) {
+      return data.keys().hasOnly(['email', 'name', 'role']) &&
+             data.email is string && data.email.size() > 0 && data.email.size() < 100 &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+             data.role in ['admin', 'client'];
+    }
+
+    function isValidPantryItem(data) {
+      return data.keys().hasOnly(['userId', 'name', 'category', 'quantity', 'unit', 'expiryDate', 'location', 'cost', 'createdAt']) &&
+             data.userId is string && data.userId.size() > 0 &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+             data.category is string && data.category.size() > 0 && data.category.size() < 50 &&
+             data.quantity is number && data.quantity >= 0 &&
+             data.unit is string && data.unit.size() > 0 && data.unit.size() < 20 &&
+             data.expiryDate is string && data.expiryDate.size() > 0 && data.expiryDate.size() < 30 &&
+             data.location is string && data.location.size() > 0 && data.location.size() < 50 &&
+             data.cost is number && data.cost >= 0 &&
+             data.createdAt is string && data.createdAt.size() > 0 && data.createdAt.size() < 30;
+    }
+
+    function isValidRecipe(data) {
+      return data.keys().hasOnly(['authorId', 'authorName', 'title', 'ingredients', 'instructions', 'createdAt']) &&
+             data.authorId is string && data.authorId.size() > 0 &&
+             data.authorName is string && data.authorName.size() > 0 && data.authorName.size() < 100 &&
+             data.title is string && data.title.size() > 0 && data.title.size() < 100 &&
+             data.ingredients is list && data.ingredients.size() > 0 && data.ingredients.size() < 50 &&
+             data.instructions is list && data.instructions.size() > 0 && data.instructions.size() < 50 &&
+             data.createdAt is string && data.createdAt.size() > 0 && data.createdAt.size() < 30;
+    }
+
+    // Rules
+    match /users/{userId} {
+      allow read: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
+      // Users can only create their profile with 'client' role, unless admin
+      allow create: if isAuthenticated() && request.auth.uid == userId && isValidUser(request.resource.data) && (request.resource.data.role == 'client' || isAdmin());
+      // Users can't escalate role
+      allow update: if isAuthenticated() && request.auth.uid == userId && isValidUser(request.resource.data) && (request.resource.data.role == resource.data.role || isAdmin());
+      allow delete: if isAdmin();
+    }
+
+    match /pantry/{itemId} {
+      // Must be owner to read
+      allow read: if isDocOwner() || isAdmin();
+      
+      // Must set userId to self upon create
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid && isValidPantryItem(request.resource.data);
+      
+      // Must remain owner upon update and can only update own docs
+      allow update: if isDocOwner() && request.resource.data.userId == resource.data.userId && isValidPantryItem(request.resource.data);
+      allow delete: if isDocOwner() || isAdmin();
+    }
+
+    match /recipes/{recipeId} {
+      // Any authenticated user can read
+      allow read: if isAuthenticated();
+      
+      // Must attach own UID
+      allow create: if isAuthenticated() && request.resource.data.authorId == request.auth.uid && isValidRecipe(request.resource.data);
+      
+      // Must be owner to update
+      allow update: if isRecipeOwner() && request.resource.data.authorId == resource.data.authorId && isValidRecipe(request.resource.data);
+      allow delete: if isRecipeOwner() || isAdmin();
+    }
+  }
+}
